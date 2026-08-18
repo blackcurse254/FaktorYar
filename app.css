@@ -305,7 +305,6 @@ table.tbl tbody tr:hover { background: var(--bg-raise); }
     position: fixed; inset-inline-start: 0; top: 0; z-index: 55;
     transform: translateX(105%);
   }
-  [dir="rtl"] .rail { transform: translateX(-105%); }
   .rail.open { transform: none; }
   .rail-toggle { display: inline-flex; }
   .main { padding: 16px 14px 50px; }
