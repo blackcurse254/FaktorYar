@@ -642,14 +642,37 @@
   function exportPdf(filename) {
     if (!window.html2canvas || !window.jspdf) { toast('کتابخانه PDF بارگذاری نشد', 'rust'); return; }
     var node = document.getElementById('paperNode');
+    if (!node) return;
     toast('در حال ساخت PDF...');
-    html2canvas(node, { scale: 2, backgroundColor: '#ffffff' }).then(function (canvas) {
-      var img = canvas.toDataURL('image/jpeg', 0.95);
-      var jsPDF = window.jspdf.jsPDF;
-      var pdf = new jsPDF({ unit: 'px', format: [canvas.width, canvas.height] });
-      pdf.addImage(img, 'JPEG', 0, 0, canvas.width, canvas.height);
-      pdf.save((filename || 'invoice') + '.pdf');
-    }).catch(function () { toast('خطا در ساخت PDF', 'rust'); });
+
+    function capture() {
+      // Clone the invoice into an off-screen, unscrolled container. Capturing the node
+      // in place is unreliable here because it sits inside a scrollable modal — html2canvas
+      // can grab the wrong/blank region depending on the modal's current scroll position.
+      var clone = node.cloneNode(true);
+      var host = document.createElement('div');
+      host.style.cssText = 'position:fixed;top:0;left:0;z-index:-1;opacity:0;pointer-events:none';
+      host.appendChild(clone);
+      document.body.appendChild(host);
+
+      html2canvas(clone, { scale: 2, backgroundColor: '#ffffff', useCORS: true }).then(function (canvas) {
+        host.remove();
+        var img = canvas.toDataURL('image/jpeg', 0.95);
+        var jsPDF = window.jspdf.jsPDF;
+        var pdf = new jsPDF({ unit: 'px', format: [canvas.width, canvas.height] });
+        pdf.addImage(img, 'JPEG', 0, 0, canvas.width, canvas.height);
+        pdf.save((filename || 'invoice') + '.pdf');
+      }).catch(function (err) {
+        host.remove();
+        console.error('[faktoryar] pdf export failed', err);
+        toast('خطا در ساخت PDF', 'rust');
+      });
+    }
+
+    // Wait for the web font to finish loading — otherwise the very first PDF after
+    // a page load can be captured with a fallback font (broken/garbled Persian text).
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(capture);
+    else capture();
   }
 
   /* ------------------------------------------------------------------ *
