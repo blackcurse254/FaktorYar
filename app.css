@@ -156,6 +156,40 @@
 .stat.jade .value { color: var(--jade); }
 .stat.brass .value { color: var(--brass); }
 .stat.rust .value { color: var(--rust); }
+.stat::before { content: ''; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 3px; }
+.stat.copper::before { background: var(--copper); }
+.stat.jade::before { background: var(--jade); }
+.stat.brass::before { background: var(--brass); }
+.stat.rust::before { background: var(--rust); }
+
+/* ---------- Paint calculator ---------- */
+.color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 12px; }
+.color-swatch {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--sw);
+  border: 2px solid var(--hair-2);
+  box-shadow: var(--lift-1);
+  transition: transform .15s var(--ease), border-color .15s var(--ease), box-shadow .15s var(--ease);
+}
+.color-swatch:hover { transform: translateY(-2px) scale(1.06); }
+.color-swatch.active { border-color: var(--copper); box-shadow: 0 0 0 3px var(--copper-wash), var(--lift-1); }
+
+.wall-preview {
+  display: flex; border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--hair); height: 220px;
+}
+.wall-half { flex: 1; position: relative; display: flex; align-items: flex-end; padding: 12px; transition: background-color .3s var(--ease); }
+.wall-half span {
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; color: rgba(20,16,10,.6);
+  background: rgba(255,255,255,.6); padding: 3px 10px; border-radius: 99px;
+}
+.wall-before {
+  background-image: repeating-linear-gradient(135deg, rgba(0,0,0,.045) 0 2px, transparent 2px 15px);
+  background-color: #C9C2B2;
+}
+.wall-after {
+  background-image: repeating-linear-gradient(100deg, rgba(255,255,255,.10) 0 3px, transparent 3px 22px);
+  border-inline-start: 1px solid rgba(255,255,255,.35);
+}
 
 /* ---------- Forms ---------- */
 .field { display: flex; flex-direction: column; gap: 6px; }

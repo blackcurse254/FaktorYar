@@ -17,6 +17,8 @@
     pickerTarget: null  // callback for item-picker modal
   };
 
+  var PC = { area: '', typeId: FD.PAINT_TYPES[0].id, coats: '', colorId: FD.PAINT_COLORS[0].id, pricePerLiter: '', labor: '' };
+
   /* ------------------------------------------------------------------ *
    * Small UI icon set (nav + actions) — stroke based, matches trade icons
    * ------------------------------------------------------------------ */
@@ -42,7 +44,10 @@
     money: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9v.01M18 15v.01"/>',
     menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
     phone: '<path d="M6.6 3.5h3l1.6 4.4-2 1.7a13 13 0 0 0 5.2 5.2l1.7-2 4.4 1.6v3a1.6 1.6 0 0 1-1.7 1.6A17 17 0 0 1 4.9 5.2 1.6 1.6 0 0 1 6.6 3.5z"/>',
-    back: '<path d="M15 5 8 12l7 7"/>'
+    back: '<path d="M15 5 8 12l7 7"/>',
+    paint: '<rect x="3" y="4" width="12" height="5.2" rx="1.6"/><path d="M15 6.6h3.4A1.6 1.6 0 0 1 20 8.2v2.6a1.6 1.6 0 0 1-1.6 1.6H11a1.5 1.5 0 0 0-1.5 1.5V16"/><rect x="7.4" y="16" width="4.2" height="5" rx="1.2"/>',
+    swap: '<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>',
+    cart: '<circle cx="9.5" cy="20" r="1.4"/><circle cx="17.5" cy="20" r="1.4"/><path d="M2.5 3.5h2.4l2.3 12.4h11l2-8.4H6.2"/>'
   };
   function svg(name, cls) { return '<svg class="' + (cls || '') + '" viewBox="0 0 24 24">' + ICO[name] + '</svg>'; }
 
@@ -107,6 +112,7 @@
   var NAV = [
     { id: 'dash', label: 'داشبورد', ico: 'dash' },
     { id: 'new', label: 'فاکتور جدید', ico: 'plus' },
+    { id: 'paintcalc', label: 'برآورد رنگ', ico: 'paint' },
     { id: 'invoices', label: 'فاکتورها', ico: 'list' },
     { id: 'clients', label: 'مشتریان', ico: 'users' },
     { id: 'catalog', label: 'قیمت‌نامه', ico: 'book' },
@@ -605,7 +611,30 @@
     document.getElementById('previewTitle').textContent = 'فاکتور ' + inv.num;
     document.getElementById('pdfBtn').onclick = function () { exportPdf(inv.num); };
     document.getElementById('printBtn').onclick = function () { window.print(); };
+    var smsBtn = document.getElementById('smsBtn');
+    smsBtn.disabled = !client.phone;
+    smsBtn.title = client.phone ? '' : 'برای این مشتری شماره تماس ثبت نشده';
+    smsBtn.onclick = function () { sendInvoiceSms(inv, client, t); };
     openModal('previewOverlay');
+  }
+
+  /** Builds a plain-language SMS summary and opens the phone's own Messages app. */
+  function smsHref(phone, body) {
+    var isIOS = /iP(hone|od|ad)/.test(navigator.userAgent || '');
+    return 'sms:' + phone + (isIOS ? '&' : '?') + 'body=' + encodeURIComponent(body);
+  }
+  function sendInvoiceSms(inv, client, t) {
+    if (!client.phone) { toast('برای این مشتری شماره تماس ثبت نشده', 'rust'); return; }
+    var p = DB.profile;
+    var lines = [
+      (p.businessName || p.owner || 'فاکتوریار') + ' — فاکتور ' + inv.num,
+      'مشتری گرامی ' + (client.name || '') + '،',
+      'مبلغ فاکتور شما: ' + FK.Money.full(t.grand),
+      'تاریخ: ' + FK.jFormat(inv.date, 'numeric')
+    ];
+    if (p.phone) lines.push('تماس: ' + FK.toFaDigits(p.phone));
+    var phone = FK.toEnDigits(client.phone).replace(/[^\d+]/g, '');
+    window.location.href = smsHref(phone, lines.join('\n'));
   }
 
   function statusLabelFa(s) { return (FD.STATUSES[s] || FD.STATUSES.draft).label; }
@@ -621,6 +650,126 @@
       pdf.addImage(img, 'JPEG', 0, 0, canvas.width, canvas.height);
       pdf.save((filename || 'invoice') + '.pdf');
     }).catch(function () { toast('خطا در ساخت PDF', 'rust'); });
+  }
+
+  /* ------------------------------------------------------------------ *
+   * PAINT CALCULATOR — متراژ + رنگ → مقدار رنگ و هزینه
+   * ------------------------------------------------------------------ */
+  function renderPaintCalc() {
+    var el = document.getElementById('view-paintcalc');
+    el.innerHTML =
+      '<div class="topbar"><div><div class="page-title display">برآورد رنگ</div><div class="page-sub">متراژ و رنگ دیوار را وارد کنید تا مقدار رنگ موردنیاز و هزینه تخمین زده شود</div></div></div>' +
+      '<div class="grid grid-2" style="align-items:start">' +
+        '<div class="card card-pad">' +
+          '<div class="field" style="margin-bottom:12px"><label>متراژ دیوار (متر مربع)</label><input class="input num" id="pcArea" inputmode="decimal" placeholder="مثلاً ۱۳۰" value="' + FK.esc(PC.area) + '"></div>' +
+          '<div class="field-row" style="margin-bottom:12px">' +
+            '<div class="field"><label>نوع رنگ</label><select class="input" id="pcType">' +
+              FD.PAINT_TYPES.map(function (tp) { return '<option value="' + tp.id + '"' + (tp.id === PC.typeId ? ' selected' : '') + '>' + tp.name + '</option>'; }).join('') +
+            '</select></div>' +
+            '<div class="field"><label>تعداد لایه</label><input class="input num" id="pcCoats" inputmode="numeric" placeholder="پیش‌فرض دو لایه" value="' + FK.esc(PC.coats) + '"></div>' +
+          '</div>' +
+          '<div class="field" style="margin-bottom:12px"><label>رنگ دیوار</label><div class="color-grid" id="pcColorGrid"></div></div>' +
+          '<div class="field-row">' +
+            '<div class="field"><label>قیمت هر لیتر رنگ (تومان)</label><input class="input num" id="pcPrice" inputmode="numeric" placeholder="۰" value="' + (PC.pricePerLiter ? FK.grouped(PC.pricePerLiter) : '') + '"></div>' +
+            '<div class="field"><label>دستمزد اجرا (تومان به‌ازای متر مربع، اختیاری)</label><input class="input num" id="pcLabor" inputmode="numeric" placeholder="۰" value="' + (PC.labor ? FK.grouped(PC.labor) : '') + '"></div>' +
+          '</div>' +
+          '<div class="hint" style="margin-top:8px">مقدار رنگ با احتساب ۱۲٪ افت و ریزش محاسبه می‌شود؛ میزان پوشش‌دهی بسته به برند و بافت دیوار متفاوت است.</div>' +
+        '</div>' +
+        '<div class="card card-pad">' +
+          '<div class="card-title" style="margin-bottom:12px">نمونه دیوار</div>' +
+          '<div class="wall-preview">' +
+            '<div class="wall-half wall-before"><span>قبل</span></div>' +
+            '<div class="wall-half wall-after" id="pcWallAfter"><span>بعد</span></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="card card-pad" id="pcResult" style="margin-top:16px"></div>';
+
+    renderColorGrid();
+    updateWallPreview();
+    compute();
+
+    document.getElementById('pcArea').addEventListener('input', function (e) { PC.area = e.target.value; compute(); });
+    document.getElementById('pcType').addEventListener('change', function (e) { PC.typeId = e.target.value; compute(); });
+    document.getElementById('pcCoats').addEventListener('input', function (e) { PC.coats = e.target.value; compute(); });
+    document.getElementById('pcPrice').addEventListener('input', function (e) { PC.pricePerLiter = FK.num(e.target.value); e.target.value = FK.grouped(PC.pricePerLiter); compute(); });
+    document.getElementById('pcLabor').addEventListener('input', function (e) { PC.labor = FK.num(e.target.value); e.target.value = FK.grouped(PC.labor); compute(); });
+
+    function renderColorGrid() {
+      var grid = document.getElementById('pcColorGrid');
+      grid.innerHTML = FD.PAINT_COLORS.map(function (c) {
+        return '<button type="button" class="color-swatch' + (c.id === PC.colorId ? ' active' : '') + '" data-color="' + c.id + '" style="--sw:' + c.hex + '" title="' + c.name + '"></button>';
+      }).join('');
+      grid.querySelectorAll('[data-color]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          PC.colorId = b.getAttribute('data-color');
+          grid.querySelectorAll('.color-swatch').forEach(function (x) { x.classList.remove('active'); });
+          b.classList.add('active');
+          updateWallPreview();
+        });
+      });
+    }
+
+    function updateWallPreview() {
+      document.getElementById('pcWallAfter').style.backgroundColor = FD.paintColorById(PC.colorId).hex;
+    }
+
+    function compute() {
+      var area = FK.num(document.getElementById('pcArea').value);
+      var type = FD.paintTypeById(PC.typeId);
+      var coatsInput = FK.num(document.getElementById('pcCoats').value);
+      var coats = coatsInput > 0 ? coatsInput : type.defaultCoats;
+      var box = document.getElementById('pcResult');
+
+      if (!area) { box.innerHTML = emptyState('متراژ دیوار را وارد کنید تا محاسبه انجام شود'); return; }
+
+      var liters = (area * coats / type.coveragePerLiter) * 1.12; // + ۱۲٪ افت و ریزش
+      var pricePerLiter = FK.num(document.getElementById('pcPrice').value);
+      var laborPerM2 = FK.num(document.getElementById('pcLabor').value);
+      var materialCost = liters * pricePerLiter;
+      var laborCost = area * laborPerM2;
+      var total = materialCost + laborCost;
+      var containers = suggestContainers(liters);
+      var color = FD.paintColorById(PC.colorId);
+
+      box.innerHTML =
+        '<div class="grid grid-4" style="margin-bottom:16px">' +
+          stat('copper', 'رنگ موردنیاز', FK.faNum(Math.round(liters * 10) / 10), 'لیتر', FK.toFaDigits(coats) + ' لایه · پوشش ' + FK.toFaDigits(type.coveragePerLiter) + ' متر بر لیتر') +
+          stat('brass', 'هزینه مواد', FK.Money.fmt(materialCost), FK.Money.unit(), pricePerLiter ? 'بر اساس قیمت واردشده' : 'قیمت هر لیتر را وارد کنید') +
+          stat('jade', 'هزینه اجرا', FK.Money.fmt(laborCost), FK.Money.unit(), laborPerM2 ? FK.toFaDigits(area) + ' متر مربع' : 'اختیاری') +
+          stat('rust', 'جمع کل', FK.Money.fmt(total), FK.Money.unit(), 'مواد + اجرا') +
+        '</div>' +
+        (containers.length ? '<div class="field" style="margin-bottom:14px"><label>پیشنهاد خرید قوطی</label><div class="flex gap-8" style="flex-wrap:wrap">' +
+          containers.map(function (c) { return '<span class="badge brass">' + FK.toFaDigits(c.count) + ' × ' + c.label + '</span>'; }).join('') +
+        '</div></div>' : '') +
+        '<button class="btn btn-primary" id="pcAddToInvoice"' + (total ? '' : ' disabled') + '>' + svg('cart') + 'افزودن به فاکتور جدید</button>';
+
+      var addBtn = document.getElementById('pcAddToInvoice');
+      addBtn.addEventListener('click', function () {
+        var inv = UI.invEdit || blankInvoice();
+        inv.items = inv.items || [];
+        inv.items.push({
+          name: 'رنگ‌آمیزی ' + type.name + ' — رنگ ' + color.name + ' (' + FK.toFaDigits(area) + ' متر مربع)',
+          unit: 'متر مربع',
+          qty: area,
+          price: area ? Math.round(total / area) : 0
+        });
+        UI.invEdit = inv;
+        go('new', { keepDraft: true });
+        toast('به فاکتور جدید اضافه شد', 'jade');
+      });
+    }
+
+    function suggestContainers(liters) {
+      if (!liters || liters <= 0) return [];
+      var sizes = FD.PAINT_CONTAINERS, remaining = liters, combo = [];
+      for (var i = 0; i < sizes.length; i++) {
+        var isLast = i === sizes.length - 1;
+        var count = isLast ? Math.ceil(remaining / sizes[i].size - 1e-6) : Math.floor(remaining / sizes[i].size);
+        if (count > 0) { combo.push({ size: sizes[i].size, label: sizes[i].label, count: count }); remaining -= count * sizes[i].size; }
+      }
+      return combo;
+    }
   }
 
   /* ------------------------------------------------------------------ *
@@ -856,7 +1005,7 @@
   /* ------------------------------------------------------------------ *
    * Router table + boot
    * ------------------------------------------------------------------ */
-  var RENDER = { dash: renderDash, new: renderNew, invoices: renderInvoices, clients: renderClients, catalog: renderCatalog, settings: renderSettings };
+  var RENDER = { dash: renderDash, new: renderNew, paintcalc: renderPaintCalc, invoices: renderInvoices, clients: renderClients, catalog: renderCatalog, settings: renderSettings };
 
   renderNav();
   go('dash');

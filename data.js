@@ -35,6 +35,35 @@
     ]
   };
 
+  /** Paint calculator: coverage per liter is m² per 1L for a single coat. */
+  var PAINT_TYPES = [
+    { id: 'plastic', name: 'پلاستیک (مات / نیمه‌براق)',   coveragePerLiter: 11, defaultCoats: 2 },
+    { id: 'acrylic', name: 'اکریلیک درجه یک',              coveragePerLiter: 12, defaultCoats: 2 },
+    { id: 'oil',     name: 'روغنی (براق)',                 coveragePerLiter: 9,  defaultCoats: 2 },
+    { id: 'primer',  name: 'بتونه + آستری (دیوار نوساز)',   coveragePerLiter: 7,  defaultCoats: 1 }
+  ];
+
+  /** Standard container sizes sold in the market, largest first. */
+  var PAINT_CONTAINERS = [
+    { size: 25, label: 'قوطی ۲۵ لیتری' },
+    { size: 9,  label: 'قوطی ۹ لیتری' },
+    { size: 3,  label: 'قوطی ۳ لیتری' },
+    { size: 1,  label: 'قوطی ۱ لیتری' }
+  ];
+
+  var PAINT_COLORS = [
+    { id: 'white',       name: 'سفید',            hex: '#F4F1EA' },
+    { id: 'cream',       name: 'کرم',              hex: '#E8DCC0' },
+    { id: 'beige',       name: 'بژ',               hex: '#D7C29E' },
+    { id: 'sand',        name: 'شنی',              hex: '#CBAE82' },
+    { id: 'lightgray',   name: 'طوسی روشن',        hex: '#C6CAD0' },
+    { id: 'gray',        name: 'طوسی',             hex: '#8D949C' },
+    { id: 'skyblue',     name: 'آبی روشن',         hex: '#A9C3D4' },
+    { id: 'sage',        name: 'سبز زیتونی',       hex: '#A2AC87' },
+    { id: 'terracotta',  name: 'کرم‌سوخته',        hex: '#C08258' },
+    { id: 'charcoal',    name: 'دودی تیره',        hex: '#484C51' }
+  ];
+
   var STATUSES = {
     draft:   { label: 'پیش‌نویس',       tone: 'neutral' },
     pending: { label: 'در انتظار پرداخت', tone: 'brass' },
@@ -47,9 +76,20 @@
     TRADES: TRADES,
     DEFAULT_CATALOG: DEFAULT_CATALOG,
     STATUSES: STATUSES,
+    PAINT_TYPES: PAINT_TYPES,
+    PAINT_CONTAINERS: PAINT_CONTAINERS,
+    PAINT_COLORS: PAINT_COLORS,
     tradeById: function (id) {
       for (var i = 0; i < TRADES.length; i++) if (TRADES[i].id === id) return TRADES[i];
       return TRADES[0];
+    },
+    paintTypeById: function (id) {
+      for (var i = 0; i < PAINT_TYPES.length; i++) if (PAINT_TYPES[i].id === id) return PAINT_TYPES[i];
+      return PAINT_TYPES[0];
+    },
+    paintColorById: function (id) {
+      for (var i = 0; i < PAINT_COLORS.length; i++) if (PAINT_COLORS[i].id === id) return PAINT_COLORS[i];
+      return PAINT_COLORS[0];
     }
   };
 })(window);
